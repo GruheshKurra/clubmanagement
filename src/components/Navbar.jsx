@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 function Navbar({ supabase }) {
     const [isOpen, setIsOpen] = useState(false);
     const [events, setEvents] = useState([]);
     const [isEventsOpen, setIsEventsOpen] = useState(false);
+    const dropdownRef = useRef(null);
 
     useEffect(() => {
         fetchEvents();
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, []);
 
     async function fetchEvents() {
@@ -20,18 +25,27 @@ function Navbar({ supabase }) {
         if (data) setEvents(data);
     }
 
+    const handleClickOutside = (event) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+            setIsEventsOpen(false);
+        }
+    };
+
     return (
         <nav className="bg-white shadow-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
-                        <Link to="/" className="text-primary-600 text-lg font-semibold">SCMS</Link>
+                        <Link to="/" className="text-blue-600 text-xl font-bold">SCMS</Link>
                     </div>
                     <div className="hidden md:block">
-                        <div className="ml-10 flex items-baseline space-x-4">
-                            <Link to="/" className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">Home</Link>
-                            <div className="relative" onMouseEnter={() => setIsEventsOpen(true)} onMouseLeave={() => setIsEventsOpen(false)}>
-                                <button className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">
+                        <div className="ml-10 flex items-center space-x-4">
+                            <NavLink to="/">Home</NavLink>
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    onClick={() => setIsEventsOpen(!isEventsOpen)}
+                                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
                                     Events
                                 </button>
                                 {isEventsOpen && (
@@ -41,7 +55,7 @@ function Navbar({ supabase }) {
                                                 <Link
                                                     key={event.id}
                                                     to={`/event/${event.id}`}
-                                                    className="block px-4 py-2 text-sm text-primary-600 hover:bg-primary-50 hover:text-primary-900"
+                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-800"
                                                     role="menuitem"
                                                 >
                                                     {event.title}
@@ -49,7 +63,7 @@ function Navbar({ supabase }) {
                                             ))}
                                             <Link
                                                 to="/events"
-                                                className="block px-4 py-2 text-sm text-primary-700 hover:bg-primary-50 hover:text-primary-900 font-medium"
+                                                className="block px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-800 font-medium"
                                                 role="menuitem"
                                             >
                                                 View All Events
@@ -58,14 +72,25 @@ function Navbar({ supabase }) {
                                     </div>
                                 )}
                             </div>
-                            <Link to="/communication-hub" className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">Communication Hub</Link>
-                            <Link to="/club-directory" className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">Club Directory</Link>
-                            <Link to="/dashboard" className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">Dashboard</Link>
+                            <NavLink to="/communication-hub">Communication Hub</NavLink>
+                            <NavLink to="/club-directory">Club Directory</NavLink>
                         </div>
                     </div>
                     <div className="md:hidden">
-                        <button onClick={() => setIsOpen(!isOpen)} className="text-primary-600 hover:text-primary-800 px-3 py-2 rounded-md text-sm transition-colors duration-300">
-                            Menu
+                        <button
+                            onClick={() => setIsOpen(!isOpen)}
+                            className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                        >
+                            <span className="sr-only">Open main menu</span>
+                            {isOpen ? (
+                                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            ) : (
+                                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -73,15 +98,36 @@ function Navbar({ supabase }) {
             {isOpen && (
                 <div className="md:hidden">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <Link to="/" className="text-primary-600 hover:text-primary-800 block px-3 py-2 rounded-md text-base transition-colors duration-300">Home</Link>
-                        <Link to="/events" className="text-primary-600 hover:text-primary-800 block px-3 py-2 rounded-md text-base transition-colors duration-300">Events</Link>
-                        <Link to="/communication-hub" className="text-primary-600 hover:text-primary-800 block px-3 py-2 rounded-md text-base transition-colors duration-300">Communication Hub</Link>
-                        <Link to="/club-directory" className="text-primary-600 hover:text-primary-800 block px-3 py-2 rounded-md text-base transition-colors duration-300">Club Directory</Link>
-                        <Link to="/dashboard" className="text-primary-600 hover:text-primary-800 block px-3 py-2 rounded-md text-base transition-colors duration-300">Dashboard</Link>
+                        <MobileNavLink to="/">Home</MobileNavLink>
+                        <MobileNavLink to="/events">Events</MobileNavLink>
+                        <MobileNavLink to="/communication-hub">Communication Hub</MobileNavLink>
+                        <MobileNavLink to="/club-directory">Club Directory</MobileNavLink>
                     </div>
                 </div>
             )}
         </nav>
+    );
+}
+
+function NavLink({ to, children }) {
+    return (
+        <Link
+            to={to}
+            className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300"
+        >
+            {children}
+        </Link>
+    );
+}
+
+function MobileNavLink({ to, children }) {
+    return (
+        <Link
+            to={to}
+            className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-300"
+        >
+            {children}
+        </Link>
     );
 }
 

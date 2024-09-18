@@ -1,14 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 
-function RegistrationProcess() {
+function RegistrationProcess({ supabase }) {
+    const [clubs, setClubs] = useState([]);
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
         studentId: '',
-        clubName: '',
+        clubId: '',
         reason: '',
         experience: 'Beginner'
     });
+
+    useEffect(() => {
+        fetchClubs();
+    }, []);
+
+    async function fetchClubs() {
+        try {
+            const { data, error } = await supabase
+                .from('clubs')
+                .select('id, name')
+                .order('name');
+            if (error) throw error;
+            setClubs(data);
+        } catch (error) {
+            console.error('Error fetching clubs:', error);
+            toast.error('Failed to fetch clubs. Please try again later.');
+        }
+    }
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -18,105 +39,125 @@ function RegistrationProcess() {
         }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Here you would typically send the form data to your backend
-        console.log('Registration submitted:', formData);
-        // Reset form or show success message
-        alert('Registration submitted successfully!');
+        try {
+            const { data, error } = await supabase
+                .from('club_registrations')
+                .insert([formData]);
+            if (error) throw error;
+            toast.success('Registration submitted successfully!');
+            setFormData({
+                fullName: '',
+                email: '',
+                studentId: '',
+                clubId: '',
+                reason: '',
+                experience: 'Beginner'
+            });
+        } catch (error) {
+            console.error('Error submitting registration:', error);
+            toast.error('Failed to submit registration. Please try again.');
+        }
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            <h1 className="text-4xl font-bold text-center text-indigo-400 mb-8">Club Registration</h1>
-            <section className="bg-gray-800 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <h2 className="text-2xl font-semibold mb-6 text-indigo-300">Register for a Club</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="fullName" className="block text-sm font-medium text-gray-300">Full Name</label>
-                        <input
-                            type="text"
-                            id="fullName"
-                            name="fullName"
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-300">Email</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="studentId" className="block text-sm font-medium text-gray-300">Student ID</label>
-                        <input
-                            type="text"
-                            id="studentId"
-                            name="studentId"
-                            value={formData.studentId}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="clubName" className="block text-sm font-medium text-gray-300">Club Name</label>
-                        <input
-                            type="text"
-                            id="clubName"
-                            name="clubName"
-                            value={formData.clubName}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="reason" className="block text-sm font-medium text-gray-300">Reason for Joining</label>
-                        <textarea
-                            id="reason"
-                            name="reason"
-                            value={formData.reason}
-                            onChange={handleChange}
-                            rows="3"
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                            required
-                        ></textarea>
-                    </div>
-                    <div>
-                        <label htmlFor="experience" className="block text-sm font-medium text-gray-300">Experience Level</label>
-                        <select
-                            id="experience"
-                            name="experience"
-                            value={formData.experience}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
-                        >
-                            <option>Beginner</option>
-                            <option>Intermediate</option>
-                            <option>Advanced</option>
-                        </select>
-                    </div>
-                    <div>
-                        <button
-                            type="submit"
-                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300"
-                        >
-                            Register
-                        </button>
-                    </div>
-                </form>
-            </section>
-        </div>
+        <motion.div
+            className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-lg shadow-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+        >
+            <h1 className="text-3xl font-bold text-center text-blue-600 mb-8">Club Registration</h1>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input
+                        type="text"
+                        id="fullName"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                    />
+                </div>
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                    />
+                </div>
+                <div>
+                    <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                    <input
+                        type="text"
+                        id="studentId"
+                        name="studentId"
+                        value={formData.studentId}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                    />
+                </div>
+                <div>
+                    <label htmlFor="clubId" className="block text-sm font-medium text-gray-700 mb-1">Club Name</label>
+                    <select
+                        id="clubId"
+                        name="clubId"
+                        value={formData.clubId}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                    >
+                        <option value="">Select a club</option>
+                        {clubs.map(club => (
+                            <option key={club.id} value={club.id}>{club.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">Reason for Joining</label>
+                    <textarea
+                        id="reason"
+                        name="reason"
+                        value={formData.reason}
+                        onChange={handleChange}
+                        rows="4"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                    ></textarea>
+                </div>
+                <div>
+                    <label htmlFor="experience" className="block text-sm font-medium text-gray-700 mb-1">Experience Level</label>
+                    <select
+                        id="experience"
+                        name="experience"
+                        value={formData.experience}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option>Beginner</option>
+                        <option>Intermediate</option>
+                        <option>Advanced</option>
+                    </select>
+                </div>
+                <div>
+                    <button
+                        type="submit"
+                        className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out"
+                    >
+                        Register
+                    </button>
+                </div>
+            </form>
+        </motion.div>
     );
 }
 

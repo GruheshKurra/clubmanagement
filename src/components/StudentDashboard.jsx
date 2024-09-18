@@ -1,150 +1,173 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+};
+
+const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+};
+
 function StudentDashboard({ supabase }) {
-    const [studentInfo, setStudentInfo] = useState({
-        name: 'John Doe',
-        id: '12345',
-        major: 'Computer Science',
-        year: 'Junior'
-    });
+    const [studentInfo, setStudentInfo] = useState(null);
     const [clubMemberships, setClubMemberships] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
     const [recentActivities, setRecentActivities] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        fetchStudentData();
-        fetchClubMemberships();
-        fetchUpcomingEvents();
-        fetchRecentActivities();
+        checkAuth();
     }, []);
 
-    async function fetchStudentData() {
-        // In a real application, you would fetch this data from your backend
-        // For now, we'll use the static data defined above
-    }
-
-    async function fetchClubMemberships() {
-        try {
-            const { data, error } = await supabase
-                .from('club_memberships')
-                .select('*')
-                .eq('student_id', studentInfo.id);
-            if (error) throw error;
-            setClubMemberships(data);
-        } catch (error) {
-            console.error('Error fetching club memberships:', error);
-            toast.error('Failed to fetch club memberships');
+    async function checkAuth() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            fetchDashboardData(user.id);
+        } else {
+            setLoading(false);
+            toast.error("Please log in to view your dashboard.");
+            navigate('/login'); // Ensure you have a login route
         }
     }
 
-    async function fetchUpcomingEvents() {
+    async function fetchDashboardData(userId) {
         try {
-            const { data, error } = await supabase
+            setLoading(true);
+
+            // Fetch student info
+            const { data: studentData, error: studentError } = await supabase
+                .from('students')
+                .select('*')
+                .eq('id', userId)
+                .single();
+            if (studentError) throw studentError;
+            setStudentInfo(studentData);
+
+            // Fetch club memberships
+            const { data: memberships, error: membershipError } = await supabase
+                .from('club_memberships')
+                .select('*, clubs(*)')
+                .eq('student_id', userId);
+            if (membershipError) throw membershipError;
+            setClubMemberships(memberships);
+
+            // Fetch upcoming events
+            const { data: events, error: eventsError } = await supabase
                 .from('events')
                 .select('*')
-                .gt('date', new Date().toISOString())
+                .gte('date', new Date().toISOString())
                 .order('date', { ascending: true })
                 .limit(5);
-            if (error) throw error;
-            setUpcomingEvents(data);
+            if (eventsError) throw eventsError;
+            setUpcomingEvents(events);
+
+            // Fetch recent activities
+            const { data: activities, error: activitiesError } = await supabase
+                .from('student_activities')
+                .select('*')
+                .eq('student_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(5);
+            if (activitiesError) throw activitiesError;
+            setRecentActivities(activities);
+
         } catch (error) {
-            console.error('Error fetching upcoming events:', error);
-            toast.error('Failed to fetch upcoming events');
+            console.error('Error fetching dashboard data:', error);
+            toast.error('Failed to load dashboard data. Please try again later.');
+        } finally {
+            setLoading(false);
         }
     }
 
-    async function fetchRecentActivities() {
-        try {
-            const { data, error } = await supabase
-                .from('student_activities')
-                .select('*')
-                .eq('student_id', studentInfo.id)
-                .order('date', { ascending: false })
-                .limit(5);
-            if (error) throw error;
-            setRecentActivities(data);
-        } catch (error) {
-            console.error('Error fetching recent activities:', error);
-            toast.error('Failed to fetch recent activities');
-        }
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen">
+            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+        </div>;
+    }
+
+    if (!studentInfo) {
+        return <div className="text-center mt-10">
+            <p>Please log in to view your dashboard.</p>
+            <Link to="/login" className="text-blue-600 hover:underline">Log In</Link>
+        </div>;
     }
 
     return (
         <motion.div
-            className="space-y-8"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="max-w-6xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-xl"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
         >
-            <h1 className="text-4xl text-indigo-400 mb-8">Student Dashboard</h1>
+            <h1 className="text-3xl font-bold text-center text-blue-600 mb-8">Student Dashboard</h1>
 
-            <section className="bg-gray-800 rounded-lg p-6 shadow-lg">
-                <h2 className="text-2xl text-indigo-300 mb-4">Welcome, {studentInfo.name}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-gray-300">Student ID: {studentInfo.id}</p>
-                        <p className="text-gray-300">Major: {studentInfo.major}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-300">Year: {studentInfo.year}</p>
-                        <p className="text-gray-300">Total Clubs: {clubMemberships.length}</p>
-                    </div>
+            <motion.section variants={itemVariants} className="mb-8">
+                <h2 className="text-2xl font-semibold text-blue-800 mb-4">Welcome, {studentInfo.name}</h2>
+                <div className="bg-blue-50 p-4 rounded-md shadow">
+                    <p className="text-gray-700"><strong>Student ID:</strong> {studentInfo.student_id}</p>
+                    <p className="text-gray-700"><strong>Email:</strong> {studentInfo.email}</p>
+                    <p className="text-gray-700"><strong>Major:</strong> {studentInfo.major}</p>
                 </div>
-            </section>
+            </motion.section>
 
-            <section className="bg-gray-800 rounded-lg p-6 shadow-lg">
-                <h2 className="text-2xl text-indigo-300 mb-4">Club Memberships</h2>
+            <motion.section variants={itemVariants} className="mb-8">
+                <h2 className="text-2xl font-semibold text-blue-800 mb-4">Your Club Memberships</h2>
                 {clubMemberships.length > 0 ? (
-                    <ul className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {clubMemberships.map(membership => (
-                            <li key={membership.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                                <span className="text-gray-300">{membership.club_name}</span>
-                                <span className="text-sm bg-indigo-600 text-white px-2 py-1 rounded">{membership.role}</span>
-                            </li>
+                            <div key={membership.id} className="bg-white p-4 rounded-md shadow">
+                                <h3 className="text-lg font-semibold text-blue-600">{membership.clubs.name}</h3>
+                                <p className="text-gray-600">Role: {membership.role}</p>
+                                <p className="text-gray-600">Joined: {new Date(membership.joined_date).toLocaleDateString()}</p>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 ) : (
-                    <p className="text-gray-400">You are not a member of any clubs yet.</p>
+                    <p className="text-gray-600">You are not a member of any clubs yet.</p>
                 )}
-                <Link to="/club-directory" className="mt-4 inline-block text-indigo-400 hover:underline">Join a Club</Link>
-            </section>
+                <Link to="/club-directory" className="mt-4 inline-block text-blue-600 hover:underline">Join a Club</Link>
+            </motion.section>
 
-            <section className="bg-gray-800 rounded-lg p-6 shadow-lg">
-                <h2 className="text-2xl text-indigo-300 mb-4">Upcoming Events</h2>
+            <motion.section variants={itemVariants} className="mb-8">
+                <h2 className="text-2xl font-semibold text-blue-800 mb-4">Upcoming Events</h2>
                 {upcomingEvents.length > 0 ? (
-                    <ul className="space-y-4">
+                    <div className="space-y-4">
                         {upcomingEvents.map(event => (
-                            <li key={event.id} className="bg-gray-700 p-4 rounded">
-                                <h3 className="text-lg text-indigo-300">{event.title}</h3>
-                                <p className="text-gray-400">Date: {new Date(event.date).toLocaleDateString()}, Time: {event.time}</p>
-                                <Link to={`/event/${event.id}`} className="text-sm text-indigo-400 hover:underline">View Details</Link>
-                            </li>
+                            <div key={event.id} className="bg-white p-4 rounded-md shadow">
+                                <h3 className="text-lg font-semibold text-blue-600">{event.title}</h3>
+                                <p className="text-gray-600">Date: {new Date(event.date).toLocaleDateString()}</p>
+                                <p className="text-gray-600">Time: {event.time}</p>
+                                <p className="text-gray-600">Location: {event.location}</p>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 ) : (
-                    <p className="text-gray-400">No upcoming events at the moment.</p>
+                    <p className="text-gray-600">No upcoming events at this time.</p>
                 )}
-                <Link to="/events" className="mt-4 inline-block text-indigo-400 hover:underline">View All Events</Link>
-            </section>
+                <Link to="/events" className="mt-4 inline-block text-blue-600 hover:underline">View All Events</Link>
+            </motion.section>
 
-            <section className="bg-gray-800 rounded-lg p-6 shadow-lg">
-                <h2 className="text-2xl text-indigo-300 mb-4">Recent Activities</h2>
+            <motion.section variants={itemVariants}>
+                <h2 className="text-2xl font-semibold text-blue-800 mb-4">Recent Activities</h2>
                 {recentActivities.length > 0 ? (
-                    <ul className="space-y-4">
+                    <div className="space-y-4">
                         {recentActivities.map(activity => (
-                            <li key={activity.id} className="bg-gray-700 p-4 rounded">
-                                <p className="text-gray-300">{activity.description}</p>
-                                <p className="text-sm text-gray-400">Date: {new Date(activity.date).toLocaleDateString()}</p>
-                            </li>
+                            <div key={activity.id} className="bg-white p-4 rounded-md shadow">
+                                <p className="text-gray-700">{activity.description}</p>
+                                <p className="text-sm text-gray-500">{new Date(activity.created_at).toLocaleString()}</p>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 ) : (
-                    <p className="text-gray-400">No recent activities to display.</p>
+                    <p className="text-gray-600">No recent activities to display.</p>
                 )}
-            </section>
+            </motion.section>
         </motion.div>
     );
 }
