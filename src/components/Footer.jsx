@@ -36,7 +36,7 @@ function Footer() {
                             <li><FooterLink to="/">Home</FooterLink></li>
                             <li><FooterLink to="/events">Events</FooterLink></li>
                             <li><FooterLink to="/club-directory">Clubs</FooterLink></li>
-                            <li><FooterLink to="/dashboard">Dashboard</FooterLink></li>
+                            <li><FooterLink to="/admin">Admin</FooterLink></li>
                         </ul>
                     </div>
                     <div>

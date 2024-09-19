@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { FaCalendar, FaUsers, FaBullhorn, FaImage, FaBlog } from 'react-icons/fa';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -14,40 +15,48 @@ const itemVariants = {
 
 function Home({ supabase }) {
     const [events, setEvents] = useState([]);
-    const [blogPosts, setBlogPosts] = useState([]);
+    const [clubs, setClubs] = useState([]);
+    const [announcements, setAnnouncements] = useState([]);
     const [galleryImages, setGalleryImages] = useState([]);
+    const [blogPosts, setBlogPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetchEvents();
-        fetchBlogPosts();
-        fetchGalleryImages();
+        fetchData();
     }, []);
 
-    async function fetchEvents() {
-        const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .order('date', { ascending: true })
-            .limit(3);
-        if (data) setEvents(data);
+    async function fetchData() {
+        setLoading(true);
+        setError(null);
+        try {
+            const [eventsData, clubsData, announcementsData, galleryData, blogData] = await Promise.all([
+                supabase.from('events').select('*').order('date', { ascending: true }).limit(3),
+                supabase.from('clubs').select('*').limit(3),
+                supabase.from('announcements').select('*').order('date', { ascending: false }).limit(3),
+                supabase.from('gallery').select('*').limit(3), // Removed created_at ordering
+                supabase.from('blog_posts').select('*').limit(3) // Removed created_at ordering
+            ]);
+
+            setEvents(eventsData.data || []);
+            setClubs(clubsData.data || []);
+            setAnnouncements(announcementsData.data || []);
+            setGalleryImages(galleryData.data || []);
+            setBlogPosts(blogData.data || []);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setError('Failed to load data. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
     }
 
-    async function fetchBlogPosts() {
-        const { data, error } = await supabase
-            .from('blog_posts')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(3);
-        if (data) setBlogPosts(data);
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen">Loading...</div>;
     }
 
-    async function fetchGalleryImages() {
-        const { data, error } = await supabase
-            .from('gallery')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(3);
-        if (data) setGalleryImages(data);
+    if (error) {
+        return <div className="text-center text-red-500 mt-10">{error}</div>;
     }
 
     return (
@@ -59,186 +68,181 @@ function Home({ supabase }) {
         >
             {/* Hero Section */}
             <motion.section variants={itemVariants} className="relative py-24 bg-gradient-to-r from-blue-600 to-indigo-600 text-white overflow-hidden">
-                <div className="absolute inset-0 bg-blue-600 opacity-50">
-                    <svg className="absolute bottom-0 left-0 w-full" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-                        <path fill="#ffffff" fillOpacity="0.2" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-                    </svg>
-                </div>
                 <div className="container mx-auto px-4 relative z-10 text-center">
                     <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">Welcome to Student Club Management</h1>
                     <p className="text-lg md:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed">
                         Explore, Engage, and Excel with our vibrant community
                     </p>
                     <Link
-                        to="/registration"
+                        to="/club-directory"
                         className="bg-white text-blue-600 px-8 py-3 rounded-full font-semibold hover:bg-blue-100 transition-colors duration-300 shadow-xl hover:shadow-2xl"
                     >
-                        Join a Club
+                        Explore Clubs
                     </Link>
                 </div>
             </motion.section>
 
             {/* Upcoming Events */}
-            <motion.section variants={itemVariants} className="container mx-auto px-4 py-16">
-                <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Upcoming Events</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                    {events.map(event => (
-                        <motion.div
-                            key={event.id}
-                            className="bg-white rounded-lg shadow-lg overflow-hidden transition-transform transform hover:scale-105 hover:shadow-2xl"
-                            whileHover={{ scale: 1.05 }}
-                        >
-                            <img
-                                src={`/api/placeholder/400/200`}
-                                alt={event.title}
-                                className="w-full h-48 object-cover"
-                            />
-                            <div className="p-6">
-                                <h3 className="text-2xl font-semibold text-gray-800 mb-2">{event.title}</h3>
-                                <p className="text-blue-600 mb-4">
-                                    {new Date(event.date).toLocaleDateString()} | {event.time}
-                                </p>
-                                <Link
-                                    to={`/event/${event.id}`}
-                                    className="text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                    Learn More →
-                                </Link>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-                <div className="text-center mt-12">
-                    <Link to="/events" className="text-blue-600 hover:text-blue-800 font-medium">
-                        View All Events →
-                    </Link>
-                </div>
-            </motion.section>
+            <Section title="Upcoming Events" icon={<FaCalendar />} link="/events">
+                {events.length > 0 ? events.map(event => (
+                    <EventCard key={event.id} event={event} />
+                )) : <NoDataMessage message="No upcoming events." />}
+            </Section>
 
-            {/* Latest Blog Posts */}
-            <motion.section variants={itemVariants} className="bg-gray-100 py-16">
-                <div className="container mx-auto px-4">
-                    <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Latest Blog Posts</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                        {blogPosts.map(post => (
-                            <motion.div
-                                key={post.id}
-                                className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 hover:shadow-2xl"
-                                whileHover={{ scale: 1.05 }}
-                            >
-                                <img
-                                    src={`/api/placeholder/400/200`}
-                                    alt={post.title}
-                                    className="w-full h-48 object-cover"
-                                />
-                                <div className="p-6">
-                                    <h3 className="text-2xl font-semibold text-gray-800 mb-2">{post.title}</h3>
-                                    <p className="text-gray-600 mb-4">{post.excerpt}</p>
-                                    <Link
-                                        to={`/blog/${post.id}`}
-                                        className="text-blue-600 hover:text-blue-800 font-medium"
-                                    >
-                                        Read More →
-                                    </Link>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                    <div className="text-center mt-12">
-                        <Link to="/blog" className="text-blue-600 hover:text-blue-800 font-medium">
-                            View All Posts →
-                        </Link>
-                    </div>
-                </div>
-            </motion.section>
+            {/* Featured Clubs */}
+            <Section title="Featured Clubs" icon={<FaUsers />} link="/club-directory" bgColor="bg-blue-50">
+                {clubs.length > 0 ? clubs.map(club => (
+                    <ClubCard key={club.id} club={club} />
+                )) : <NoDataMessage message="No clubs available." />}
+            </Section>
+
+            {/* Latest Announcements */}
+            <Section title="Latest Announcements" icon={<FaBullhorn />} link="/announcements">
+                {announcements.length > 0 ? announcements.map(announcement => (
+                    <AnnouncementCard key={announcement.id} announcement={announcement} />
+                )) : <NoDataMessage message="No announcements available." />}
+            </Section>
 
             {/* Gallery */}
-            <motion.section variants={itemVariants} className="container mx-auto px-4 py-16">
-                <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Gallery</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                    {galleryImages.map(image => (
-                        <motion.div
-                            key={image.id}
-                            className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 hover:shadow-2xl"
-                            whileHover={{ scale: 1.05 }}
-                        >
-                            <img
-                                src={image.image_url || `/api/placeholder/400/400`}
-                                alt={image.title}
-                                className="w-full h-64 object-cover"
-                            />
-                            <div className="p-4">
-                                <p className="text-gray-600">{image.description}</p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-                <div className="text-center mt-12">
-                    <Link to="/gallery" className="text-blue-600 hover:text-blue-800 font-medium">
-                        View Full Gallery →
-                    </Link>
-                </div>
-            </motion.section>
+            <Section title="Gallery" icon={<FaImage />} link="/gallery" bgColor="bg-blue-50">
+                {galleryImages.length > 0 ? galleryImages.map(image => (
+                    <GalleryCard key={image.id} image={image} />
+                )) : <NoDataMessage message="No gallery images available." />}
+            </Section>
 
-            {/* Features */}
-            <motion.section variants={itemVariants} className="bg-gray-100 py-16">
-                <div className="container mx-auto px-4">
-                    <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Explore Our Features</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                        <FeatureCard
-                            title="Club Directory"
-                            description="Discover and join a wide variety of student clubs."
-                            link="/club-directory"
-                            linkText="Browse Clubs"
-                        />
-                        <FeatureCard
-                            title="Event Scheduling"
-                            description="Easily schedule and manage club events."
-                            link="/event-scheduling"
-                            linkText="Schedule an Event"
-                        />
-                        <FeatureCard
-                            title="Communication Hub"
-                            description="Stay connected with club members and announcements."
-                            link="/communication-hub"
-                            linkText="Connect Now"
-                        />
-                        <FeatureCard
-                            title="Student Dashboard"
-                            description="Track your club activities and achievements."
-                            link="/dashboard"
-                            linkText="View Dashboard"
-                        />
-                        <FeatureCard
-                            title="Event Feedback"
-                            description="Share your thoughts on recent events."
-                            link="/event-feedback"
-                            linkText="Give Feedback"
-                        />
-                        <FeatureCard
-                            title="Attendance Tracker"
-                            description="Keep track of event participation."
-                            link="/attendance"
-                            linkText="Check Attendance"
-                        />
-                    </div>
-                </div>
-            </motion.section>
+            {/* Blog Posts */}
+            <Section title="Latest Blog Posts" icon={<FaBlog />} link="/blog-posts">
+                {blogPosts.length > 0 ? blogPosts.map(post => (
+                    <BlogCard key={post.id} post={post} />
+                )) : <NoDataMessage message="No blog posts available." />}
+            </Section>
         </motion.div>
     );
 }
 
-function FeatureCard({ title, description, link, linkText }) {
+function Section({ title, icon, link, children, bgColor = 'bg-white' }) {
+    return (
+        <motion.section variants={itemVariants} className={`py-16 ${bgColor}`}>
+            <div className="container mx-auto px-4">
+                <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-3xl font-bold text-gray-800 flex items-center">
+                        {icon && <span className="mr-2">{icon}</span>}
+                        {title}
+                    </h2>
+                    <Link to={link} className="text-blue-600 hover:text-blue-800 font-medium">
+                        View All →
+                    </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {children}
+                </div>
+            </div>
+        </motion.section>
+    );
+}
+
+function NoDataMessage({ message }) {
+    return <div className="col-span-3 text-center text-gray-500">{message}</div>;
+}
+
+function EventCard({ event }) {
     return (
         <motion.div
-            className="bg-white p-8 rounded-lg shadow-lg border border-gray-200 transition-transform transform hover:scale-105 hover:shadow-2xl"
-            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 hover:shadow-lg"
+            whileHover={{ scale: 1.03 }}
         >
-            <h3 className="text-2xl font-semibold text-gray-900 mb-4">{title}</h3>
-            <p className="text-gray-600 mb-6">{description}</p>
-            <Link to={link} className="text-blue-600 hover:text-blue-800 font-medium">
-                {linkText} →
-            </Link>
+            <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{event.title}</h3>
+                <p className="text-blue-600 mb-2">
+                    {new Date(event.date).toLocaleDateString()} | {event.time}
+                </p>
+                <p className="text-gray-600 mb-4">{event.location}</p>
+                <Link
+                    to={`/event/${event.id}`}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                    Learn More →
+                </Link>
+            </div>
+        </motion.div>
+    );
+}
+
+function ClubCard({ club }) {
+    return (
+        <motion.div
+            className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 hover:shadow-lg"
+            whileHover={{ scale: 1.03 }}
+        >
+            <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{club.name}</h3>
+                <p className="text-gray-600 mb-4">{club.description && club.description.substring(0, 100)}...</p>
+                <Link
+                    to={`/club/${club.id}`}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                    View Club →
+                </Link>
+            </div>
+        </motion.div>
+    );
+}
+
+function AnnouncementCard({ announcement }) {
+    return (
+        <motion.div
+            className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 hover:shadow-lg"
+            whileHover={{ scale: 1.03 }}
+        >
+            <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{announcement.title}</h3>
+                <p className="text-gray-600 mb-2">{announcement.content && announcement.content.substring(0, 100)}...</p>
+                <p className="text-blue-600">{new Date(announcement.date).toLocaleDateString()}</p>
+            </div>
+        </motion.div>
+    );
+}
+
+function GalleryCard({ image }) {
+    return (
+        <motion.div
+            className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 hover:shadow-lg"
+            whileHover={{ scale: 1.03 }}
+        >
+            {image.image_url ? (
+                <img src={image.image_url} alt={image.title} className="w-full h-48 object-cover" />
+            ) : (
+                <div className="w-full h-48 bg-gray-200 flex items-center justify-center">No Image</div>
+            )}
+            <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">{image.title}</h3>
+                <p className="text-gray-600">{image.description && image.description.substring(0, 50)}...</p>
+            </div>
+        </motion.div>
+    );
+}
+
+function BlogCard({ post }) {
+    return (
+        <motion.div
+            className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 hover:shadow-lg"
+            whileHover={{ scale: 1.03 }}
+        >
+            {post.image_url ? (
+                <img src={post.image_url} alt={post.title} className="w-full h-48 object-cover" />
+            ) : (
+                <div className="w-full h-48 bg-gray-200 flex items-center justify-center">No Image</div>
+            )}
+            <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{post.title}</h3>
+                <p className="text-gray-600 mb-4">{post.content && post.content.substring(0, 100)}...</p>
+                <Link
+                    to={`/blog/${post.id}`}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                    Read More →
+                </Link>
+            </div>
         </motion.div>
     );
 }

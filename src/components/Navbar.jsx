@@ -74,6 +74,7 @@ function Navbar({ supabase }) {
                             </div>
                             <NavLink to="/communication-hub">Communication Hub</NavLink>
                             <NavLink to="/club-directory">Club Directory</NavLink>
+                            <NavLink to="/attendance">Attendance</NavLink>
                         </div>
                     </div>
                     <div className="md:hidden">
@@ -102,6 +103,7 @@ function Navbar({ supabase }) {
                         <MobileNavLink to="/events">Events</MobileNavLink>
                         <MobileNavLink to="/communication-hub">Communication Hub</MobileNavLink>
                         <MobileNavLink to="/club-directory">Club Directory</MobileNavLink>
+                        <MobileNavLink to="/attendance">Attendance</MobileNavLink>
                     </div>
                 </div>
             )}

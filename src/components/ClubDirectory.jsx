@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 
@@ -17,6 +18,8 @@ function ClubDirectory({ supabase }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('All');
+
+    const navigate = useNavigate(); // Initialize navigation
 
     useEffect(() => {
         fetchClubs();
@@ -45,6 +48,11 @@ function ClubDirectory({ supabase }) {
     );
 
     const categories = ['All', ...new Set(clubs.map(club => club.category))];
+
+    const handleJoinClub = (clubId) => {
+        // Here we can navigate to a ClubDetails page, or trigger a modal/form to join
+        navigate(`/club/${clubId}`); // Assuming you have a route like /club/:id for club details
+    };
 
     if (loading) {
         return <div className="flex justify-center items-center h-screen">
@@ -97,7 +105,10 @@ function ClubDirectory({ supabase }) {
                             <p className="text-gray-700">{club.description}</p>
                         </div>
                         <div className="p-6 bg-gray-50">
-                            <button className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-300">
+                            <button
+                                className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-300"
+                                onClick={() => handleJoinClub(club.id)} // Handle join button click
+                            >
                                 Join Club
                             </button>
                         </div>

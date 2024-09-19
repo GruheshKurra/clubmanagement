@@ -1,648 +1,253 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { v4 as uuidv4 } from 'uuid';
 
 function AdminPage({ supabase }) {
-    const [events, setEvents] = useState([]);
-    const [clubs, setClubs] = useState([]);
-    const [announcements, setAnnouncements] = useState([]);
-    const [galleryItems, setGalleryItems] = useState([]);
-    const [blogPosts, setBlogPosts] = useState([]);
-    const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', duration: '', location: '', description: '' });
-    const [newClub, setNewClub] = useState({ name: '', category: '', member_count: '', description: '' });
-    const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
-    const [newGalleryItem, setNewGalleryItem] = useState({ title: '', description: '', image: null });
-    const [newBlogPost, setNewBlogPost] = useState({ title: '', content: '', image: null });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [password, setPassword] = useState('');
     const [activeTab, setActiveTab] = useState('events');
+    const [loading, setLoading] = useState(false);
+    const [data, setData] = useState([]);
+    const [newItem, setNewItem] = useState({});
+    const [editingId, setEditingId] = useState(null);
 
     useEffect(() => {
-        fetchAllData();
-    }, []);
+        if (isAuthenticated) {
+            fetchData(activeTab);
+        }
+    }, [activeTab, isAuthenticated]);
 
-    async function fetchAllData() {
+    const handleLogin = (e) => {
+        e.preventDefault();
+        if (password === 'Sujju@005065') {
+            setIsAuthenticated(true);
+            toast.success('Successfully authenticated.');
+        } else {
+            toast.error('Incorrect password');
+        }
+    };
+
+    async function fetchData(table) {
         setLoading(true);
-        setError(null);
         try {
-            await Promise.all([
-                fetchEvents(),
-                fetchClubs(),
-                fetchAnnouncements(),
-                fetchGalleryItems(),
-                fetchBlogPosts()
-            ]);
-        } catch (err) {
-            console.error('Error fetching data:', err);
-            setError('Failed to fetch data. Please check your connection and try again.');
+            const { data, error } = await supabase.from(table).select('*');
+            if (error) throw error;
+            setData(data);
+        } catch (error) {
+            console.error(`Error fetching ${table}:`, error);
+            toast.error(`Failed to fetch ${table}. Please try again.`);
         } finally {
             setLoading(false);
         }
     }
 
-    async function fetchEvents() {
-        const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
-        if (error) throw error;
-        setEvents(data || []);
-    }
-
-    async function fetchClubs() {
-        const { data, error } = await supabase.from('clubs').select('*');
-        if (error) throw error;
-        setClubs(data || []);
-    }
-
-    async function fetchAnnouncements() {
-        const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        setAnnouncements(data || []);
-    }
-
-    async function fetchGalleryItems() {
-        const { data, error } = await supabase.from('gallery').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        setGalleryItems(data || []);
-    }
-
-    async function fetchBlogPosts() {
-        const { data, error } = await supabase.from('blog_posts').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        setBlogPosts(data || []);
-    }
-
-    async function handleEventSubmit(e) {
-        e.preventDefault();
+    async function handleCreate(table) {
         try {
-            const { data, error } = await supabase.from('events').insert([newEvent]);
+            const { error } = await supabase.from(table).insert([newItem]);
             if (error) throw error;
-            toast.success('Event added successfully');
-            fetchEvents();
-            setNewEvent({ title: '', date: '', time: '', duration: '', location: '', description: '' });
-        } catch (err) {
-            console.error('Error adding event:', err);
-            toast.error('Failed to add event');
+            toast.success(`${table.replace('_', ' ')} created successfully`);
+            fetchData(table);
+            setNewItem({});
+        } catch (error) {
+            console.error(`Error creating ${table} item:`, error);
+            toast.error(`Failed to create ${table} item. Please try again.`);
         }
     }
 
-    async function handleClubSubmit(e) {
-        e.preventDefault();
+    async function handleUpdate(table, id) {
         try {
-            const { data, error } = await supabase.from('clubs').insert([newClub]);
+            const { error } = await supabase.from(table).update(newItem).eq('id', id);
             if (error) throw error;
-            toast.success('Club added successfully');
-            fetchClubs();
-            setNewClub({ name: '', category: '', member_count: '', description: '' });
-        } catch (err) {
-            console.error('Error adding club:', err);
-            toast.error('Failed to add club');
-        }
-    }
-
-    async function handleAnnouncementSubmit(e) {
-        e.preventDefault();
-        try {
-            const { data, error } = await supabase.from('announcements').insert([newAnnouncement]);
-            if (error) throw error;
-            toast.success('Announcement added successfully');
-            fetchAnnouncements();
-            setNewAnnouncement({ title: '', content: '' });
-        } catch (err) {
-            console.error('Error adding announcement:', err);
-            toast.error('Failed to add announcement');
-        }
-    }
-
-    async function handleGallerySubmit(e) {
-        e.preventDefault();
-        try {
-            if (!newGalleryItem.image) {
-                throw new Error('Please select an image');
-            }
-
-            const file = newGalleryItem.image;
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${uuidv4()}.${fileExt}`;
-            const filePath = `gallery/${fileName}`;
-
-            // Upload image to Supabase Storage
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            // Get public URL of uploaded image
-            const { data: { publicUrl }, error: urlError } = supabase.storage
-                .from('images')
-                .getPublicUrl(filePath);
-
-            if (urlError) throw urlError;
-
-            // Insert gallery item into database
-            const { data, error } = await supabase.from('gallery').insert([
-                { ...newGalleryItem, image_url: publicUrl }
-            ]);
-
-            if (error) throw error;
-
-            toast.success('Gallery item added successfully');
-            fetchGalleryItems();
-            setNewGalleryItem({ title: '', description: '', image: null });
-        } catch (err) {
-            console.error('Error adding gallery item:', err);
-            toast.error('Failed to add gallery item');
-        }
-    }
-
-    async function handleBlogPostSubmit(e) {
-        e.preventDefault();
-        try {
-            let imageUrl = null;
-
-            if (newBlogPost.image) {
-                const file = newBlogPost.image;
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${uuidv4()}.${fileExt}`;
-                const filePath = `blog/${fileName}`;
-
-                // Upload image to Supabase Storage
-                const { error: uploadError } = await supabase.storage
-                    .from('images')
-                    .upload(filePath, file);
-
-                if (uploadError) throw uploadError;
-
-                // Get public URL of uploaded image
-                const { data: { publicUrl }, error: urlError } = supabase.storage
-                    .from('images')
-                    .getPublicUrl(filePath);
-
-                if (urlError) throw urlError;
-
-                imageUrl = publicUrl;
-            }
-
-            // Insert blog post into database
-            const { data, error } = await supabase.from('blog_posts').insert([
-                { ...newBlogPost, image_url: imageUrl }
-            ]);
-
-            if (error) throw error;
-
-            toast.success('Blog post added successfully');
-            fetchBlogPosts();
-            setNewBlogPost({ title: '', content: '', image: null });
-        } catch (err) {
-            console.error('Error adding blog post:', err);
-            toast.error('Failed to add blog post');
+            toast.success(`${table.replace('_', ' ')} updated successfully`);
+            fetchData(table);
+            setNewItem({});
+            setEditingId(null);
+        } catch (error) {
+            console.error(`Error updating ${table} item:`, error);
+            toast.error(`Failed to update ${table} item. Please try again.`);
         }
     }
 
     async function handleDelete(table, id) {
         try {
-            const { error } = await supabase.from(table).delete().match({ id });
+            const { error } = await supabase.from(table).delete().eq('id', id);
             if (error) throw error;
-            toast.success(`${table} item deleted successfully`);
-            fetchAllData();
-        } catch (err) {
-            console.error(`Error deleting ${table} item:`, err);
-            toast.error(`Failed to delete ${table} item`);
+            toast.success(`${table.replace('_', ' ')} deleted successfully`);
+            fetchData(table);
+        } catch (error) {
+            console.error(`Error deleting ${table} item:`, error);
+            toast.error(`Failed to delete ${table} item. Please try again.`);
         }
     }
 
-    if (loading) {
-        return <div className="flex justify-center items-center h-screen">
-            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-        </div>;
+    function renderForm(table) {
+        const fields = getFields(table);
+        return (
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    editingId ? handleUpdate(table, editingId) : handleCreate(table);
+                }}
+                className="space-y-6 bg-white p-8 rounded-xl shadow-lg"
+            >
+                <h2 className="text-3xl font-bold text-gray-800 mb-6">{editingId ? 'Edit' : 'Create'} {table.replace('_', ' ')}</h2>
+                {fields.map((field) => (
+                    <div key={field} className="flex flex-col">
+                        <label htmlFor={field} className="mb-2 text-sm font-medium text-gray-700">
+                            {field.replace('_', ' ').charAt(0).toUpperCase() + field.replace('_', ' ').slice(1)}
+                        </label>
+                        <input
+                            id={field}
+                            type={getInputType(field)} // Set type based on field name
+                            placeholder={field.replace('_', ' ')}
+                            value={newItem[field] || ''}
+                            onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
+                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                            required
+                        />
+                    </div>
+                ))}
+                <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105">
+                    {editingId ? 'Update' : 'Create'}
+                </button>
+            </form>
+        );
     }
 
-    if (error) {
+    function renderTable(table, data) {
+        const fields = getFields(table);
         return (
-            <div className="text-center text-red-600 p-4">
-                <p className="text-xl font-semibold mb-4">{error}</p>
-                <button
-                    onClick={fetchAllData}
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-300"
-                >
-                    Retry
-                </button>
+            <div className="overflow-x-auto bg-white rounded-xl shadow-lg">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            {fields.map((field) => (
+                                <th key={field} className="p-4 font-semibold text-gray-700 border-b">
+                                    {field.replace('_', ' ').charAt(0).toUpperCase() + field.replace('_', ' ').slice(1)}
+                                </th>
+                            ))}
+                            <th className="p-4 font-semibold text-gray-700 border-b">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition duration-200">
+                                {fields.map((field) => (
+                                    <td key={field} className="p-4 border-b">{item[field]}</td>
+                                ))}
+                                <td className="p-4 border-b">
+                                    <button
+                                        onClick={() => { setNewItem(item); setEditingId(item.id); }}
+                                        className="bg-yellow-500 text-white px-4 py-2 rounded-md mr-2 hover:bg-yellow-600 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(table, item.id)}
+                                        className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    }
+
+    function getFields(table) {
+        switch (table) {
+            case 'events':
+                return ['title', 'date', 'time', 'location', 'description'];
+            case 'clubs':
+                return ['name', 'description', 'president', 'email'];
+            case 'announcements':
+                return ['title', 'content', 'date'];
+            case 'gallery':
+                return ['title', 'description', 'image_url'];
+            case 'blog_posts':
+                return ['title', 'content', 'author', 'image_url'];
+            case 'attendees':
+                return ['event_id', 'name', 'student_id'];
+            case 'messages':
+                return ['sender', 'recipient', 'content', 'timestamp'];
+            case 'club_members':
+                return ['club_id', 'student_id', 'role'];
+            default:
+                return [];
+        }
+    }
+
+    function getInputType(field) {
+        if (field === 'date') return 'date';
+        if (field === 'time') return 'time';
+        return 'text';
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-blue-500 to-purple-600">
+                <form onSubmit={handleLogin} className="bg-white p-10 rounded-xl shadow-2xl w-96 transform transition duration-500 hover:scale-105">
+                    <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">Admin Login</h2>
+                    <div className="mb-6">
+                        <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline transition duration-300"
+                            required
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline w-full transition duration-300 transform hover:scale-105"
+                    >
+                        Login
+                    </button>
+                </form>
             </div>
         );
     }
 
     return (
-        <div className="admin-page space-y-8 p-4 bg-gray-50 min-h-screen">
-            <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">Admin Dashboard</h1>
-
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="flex flex-wrap border-b">
-                    <TabButton active={activeTab === 'events'} onClick={() => setActiveTab('events')}>Manage Events</TabButton>
-                    <TabButton active={activeTab === 'clubs'} onClick={() => setActiveTab('clubs')}>Manage Clubs</TabButton>
-                    <TabButton active={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')}>Manage Announcements</TabButton>
-                    <TabButton active={activeTab === 'gallery'} onClick={() => setActiveTab('gallery')}>Manage Gallery</TabButton>
-                    <TabButton active={activeTab === 'blog'} onClick={() => setActiveTab('blog')}>Manage Blog</TabButton>
+        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+                <h1 className="text-5xl font-extrabold text-center text-blue-600 mb-12 transform transition duration-500 hover:scale-105">Admin Dashboard</h1>
+                <div className="flex flex-wrap justify-center mb-8 bg-white rounded-xl shadow-lg p-4">
+                    {['events', 'clubs', 'announcements', 'gallery', 'blog_posts', 'attendees', 'messages', 'club_members'].map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`m-2 px-6 py-3 rounded-full transition duration-300 ease-in-out transform hover:scale-105 ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            {tab.replace('_', ' ').charAt(0).toUpperCase() + tab.replace('_', ' ').slice(1)}
+                        </button>
+                    ))}
                 </div>
-
-                <div className="p-6">
-                    {activeTab === 'events' && (
-                        <EventsSection
-                            events={events}
-                            newEvent={newEvent}
-                            setNewEvent={setNewEvent}
-                            handleEventSubmit={handleEventSubmit}
-                            handleDelete={handleDelete}
-                        />
-                    )}
-
-                    {activeTab === 'clubs' && (
-                        <ClubsSection
-                            clubs={clubs}
-                            newClub={newClub}
-                            setNewClub={setNewClub}
-                            handleClubSubmit={handleClubSubmit}
-                            handleDelete={handleDelete}
-                        />
-                    )}
-
-                    {activeTab === 'announcements' && (
-                        <AnnouncementsSection
-                            announcements={announcements}
-                            newAnnouncement={newAnnouncement}
-                            setNewAnnouncement={setNewAnnouncement}
-                            handleAnnouncementSubmit={handleAnnouncementSubmit}
-                            handleDelete={handleDelete}
-                        />
-                    )}
-
-                    {activeTab === 'gallery' && (
-                        <GallerySection
-                            galleryItems={galleryItems}
-                            newGalleryItem={newGalleryItem}
-                            setNewGalleryItem={setNewGalleryItem}
-                            handleGallerySubmit={handleGallerySubmit}
-                            handleDelete={handleDelete}
-                        />
-                    )}
-
-                    {activeTab === 'blog' && (
-                        <BlogSection
-                            blogPosts={blogPosts}
-                            newBlogPost={newBlogPost}
-                            setNewBlogPost={setNewBlogPost}
-                            handleBlogPostSubmit={handleBlogPostSubmit}
-                            handleDelete={handleDelete}
-                        />
-                    )}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold mb-4 text-gray-800">{editingId ? 'Edit' : 'Create'} {activeTab.replace('_', ' ')}</h2>
+                        {renderForm(activeTab)}
+                    </div>
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold mb-4 text-gray-800">{activeTab.replace('_', ' ')} List</h2>
+                        {loading ? (
+                            <div className="flex justify-center items-center h-64">
+                                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                {renderTable(activeTab, data)}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-
-            {/* Quick Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-8">
-                <StatCard title="Total Events" value={events.length} />
-                <StatCard title="Total Clubs" value={clubs.length} />
-                <StatCard title="Total Announcements" value={announcements.length} />
-                <StatCard title="Gallery Items" value={galleryItems.length} />
-                <StatCard title="Blog Posts" value={blogPosts.length} />
-            </div>
-
-            {/* Refresh Data Button */}
-            <div className="text-center mt-8">
-                <button
-                    onClick={fetchAllData}
-                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors duration-300"
-                >
-                    Refresh All Data
-                </button>
             </div>
         </div>
-    );
-}
-
-function TabButton({ active, onClick, children }) {
-    return (
-        <button
-            className={`flex-1 py-2 px-4 text-center ${active ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-            onClick={onClick}
-        >
-            {children}
-        </button>
-    );
-}
-
-function StatCard({ title, value }) {
-    return (
-        <div className="bg-white p-4 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
-            <p className="text-3xl font-bold text-blue-500">{value}</p>
-        </div>
-    );
-}
-
-function EventsSection({ events, newEvent, setNewEvent, handleEventSubmit, handleDelete }) {
-    return (
-        <>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Events</h2>
-            <form onSubmit={handleEventSubmit} className="space-y-4 mb-6">
-                <input
-                    type="text"
-                    placeholder="Event Title"
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <div className="grid grid-cols-2 gap-4">
-                    <input
-                        type="date"
-                        value={newEvent.date}
-                        onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                        required
-                    />
-                    <input
-                        type="time"
-                        value={newEvent.time}
-                        onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                        required
-                    />
-                </div>
-                <input
-                    type="number"
-                    placeholder="Duration (minutes)"
-                    value={newEvent.duration}
-                    onChange={(e) => setNewEvent({ ...newEvent, duration: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Location"
-                    value={newEvent.location}
-                    onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <textarea
-                    placeholder="Description"
-                    value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                ></textarea>
-                <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Add Event
-                </button>
-            </form>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="p-2">Title</th>
-                            <th className="p-2">Date</th>
-                            <th className="p-2">Time</th>
-                            <th className="p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {events.map(event => (
-                            <tr key={event.id} className="border-b border-gray-200">
-                                <td className="p-2">{event.title}</td>
-                                <td className="p-2">{event.date}</td>
-                                <td className="p-2">{event.time}</td>
-                                <td className="p-2">
-                                    <button onClick={() => handleDelete('events', event.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors duration-300">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function ClubsSection({ clubs, newClub, setNewClub, handleClubSubmit, handleDelete }) {
-    return (
-        <>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Clubs</h2>
-            <form onSubmit={handleClubSubmit} className="space-y-4 mb-6">
-                <input
-                    type="text"
-                    placeholder="Club Name"
-                    value={newClub.name}
-                    onChange={(e) => setNewClub({ ...newClub, name: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Category"
-                    value={newClub.category}
-                    onChange={(e) => setNewClub({ ...newClub, category: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <input
-                    type="number"
-                    placeholder="Member Count"
-                    value={newClub.member_count}
-                    onChange={(e) => setNewClub({ ...newClub, member_count: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <textarea
-                    placeholder="Description"
-                    value={newClub.description}
-                    onChange={(e) => setNewClub({ ...newClub, description: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                ></textarea>
-                <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Add Club
-                </button>
-            </form>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="p-2">Name</th>
-                            <th className="p-2">Category</th>
-                            <th className="p-2">Members</th>
-                            <th className="p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {clubs.map(club => (
-                            <tr key={club.id} className="border-b border-gray-200">
-                                <td className="p-2">{club.name}</td>
-                                <td className="p-2">{club.category}</td>
-                                <td className="p-2">{club.member_count}</td>
-                                <td className="p-2">
-                                    <button onClick={() => handleDelete('clubs', club.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors duration-300">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function AnnouncementsSection({ announcements, newAnnouncement, setNewAnnouncement, handleAnnouncementSubmit, handleDelete }) {
-    return (
-        <>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Announcements</h2>
-            <form onSubmit={handleAnnouncementSubmit} className="space-y-4 mb-6">
-                <input
-                    type="text"
-                    placeholder="Announcement Title"
-                    value={newAnnouncement.title}
-                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <textarea
-                    placeholder="Content"
-                    value={newAnnouncement.content}
-                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                ></textarea>
-                <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Add Announcement
-                </button>
-            </form>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="p-2">Title</th>
-                            <th className="p-2">Content</th>
-                            <th className="p-2">Date</th>
-                            <th className="p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {announcements.map(announcement => (
-                            <tr key={announcement.id} className="border-b border-gray-200">
-                                <td className="p-2">{announcement.title}</td>
-                                <td className="p-2">{announcement.content.substring(0, 50)}...</td>
-                                <td className="p-2">{new Date(announcement.created_at).toLocaleDateString()}</td>
-                                <td className="p-2">
-                                    <button onClick={() => handleDelete('announcements', announcement.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors duration-300">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function GallerySection({ galleryItems, newGalleryItem, setNewGalleryItem, handleGallerySubmit, handleDelete }) {
-    return (
-        <>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Gallery</h2>
-            <form onSubmit={handleGallerySubmit} className="space-y-4 mb-6">
-                <input
-                    type="text"
-                    placeholder="Image Title"
-                    value={newGalleryItem.title}
-                    onChange={(e) => setNewGalleryItem({ ...newGalleryItem, title: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <textarea
-                    placeholder="Description"
-                    value={newGalleryItem.description}
-                    onChange={(e) => setNewGalleryItem({ ...newGalleryItem, description: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                ></textarea>
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setNewGalleryItem({ ...newGalleryItem, image: e.target.files[0] })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Add Gallery Item
-                </button>
-            </form>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {galleryItems.map(item => (
-                    <div key={item.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                        <img src={item.image_url} alt={item.title} className="w-full h-48 object-cover" />
-                        <div className="p-4">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.title}</h3>
-                            <p className="text-gray-600 mb-4">{item.description}</p>
-                            <button onClick={() => handleDelete('gallery', item.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors duration-300">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </>
-    );
-}
-
-function BlogSection({ blogPosts, newBlogPost, setNewBlogPost, handleBlogPostSubmit, handleDelete }) {
-    return (
-        <>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Blog Posts</h2>
-            <form onSubmit={handleBlogPostSubmit} className="space-y-4 mb-6">
-                <input
-                    type="text"
-                    placeholder="Blog Post Title"
-                    value={newBlogPost.title}
-                    onChange={(e) => setNewBlogPost({ ...newBlogPost, title: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                />
-                <textarea
-                    placeholder="Content"
-                    value={newBlogPost.content}
-                    onChange={(e) => setNewBlogPost({ ...newBlogPost, content: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                    required
-                ></textarea>
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setNewBlogPost({ ...newBlogPost, image: e.target.files[0] })}
-                    className="w-full p-2 border border-gray-300 rounded text-gray-800"
-                />
-                <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Add Blog Post
-                </button>
-            </form>
-            <div className="space-y-4">
-                {blogPosts.map(post => (
-                    <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden p-4">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">{post.title}</h3>
-                        <p className="text-gray-600 mb-4">{post.content.substring(0, 100)}...</p>
-                        {post.image_url && <img src={post.image_url} alt={post.title} className="w-full h-48 object-cover mb-4" />}
-                        <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-500">{new Date(post.created_at).toLocaleDateString()}</span>
-                            <button onClick={() => handleDelete('blog_posts', post.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors duration-300">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </>
     );
 }
 
