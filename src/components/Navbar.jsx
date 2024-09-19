@@ -36,7 +36,7 @@ function Navbar({ supabase }) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
-                        <Link to="/" className="text-blue-600 text-xl font-bold">SCMS</Link>
+                        <Link to="/" className="text-blue-600 text-xl font-bold">STudentClubsAU</Link>
                     </div>
                     <div className="hidden md:block">
                         <div className="ml-10 flex items-center space-x-4">
